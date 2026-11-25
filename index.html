@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar-Potenzial-Analyse</title>
+<meta name="description" content="Schnelle Abschätzung des PV-Ertrags von Dach- und Fassadenflächen in der frühen Entwurfsphase.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23e8a33d'/%3E%3Cg stroke='%23e8a33d' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M16 2v4M16 26v4M2 16h4M26 16h4M6 6l3 3M23 23l3 3M6 26l3-3M23 9l3-3'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f5f1; --panel:#ffffff; --panel-2:#f0eee8; --ink:#1d1d1b; --ink-2:#5c5a55; --ink-3:#8a877f;
+  --line:#e2dfd6; --accent:#d98a1f; --accent-ink:#ffffff; --grid:#ebe8e0; --danger:#c0392b;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413; --panel:#1e1e1c; --panel-2:#262624; --ink:#f2f0ea; --ink-2:#b5b2a9; --ink-3:#85827a;
+    --line:#34332f; --accent:#f0a83a; --accent-ink:#1a1206; --grid:#2c2b28; --danger:#e5604f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413; --panel:#1e1e1c; --panel-2:#262624; --ink:#f2f0ea; --ink-2:#b5b2a9; --ink-3:#85827a;
+  --line:#34332f; --accent:#f0a83a; --accent-ink:#1a1206; --grid:#2c2b28; --danger:#e5604f; --shadow:none;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1320px;margin:0 auto;padding:28px 24px 64px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:24px}
+h1{font-size:28px;line-height:1.15;margin:0;letter-spacing:-.01em}
+.sub{color:var(--ink-2);margin:6px 0 0;max-width:62ch}
+.tag{font-size:12px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.layout{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:20px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+.stack>*+*{margin-top:16px}
+h2{font-size:15px;margin:0 0 12px;font-weight:650}
+h3{font-size:14px;margin:0;font-weight:600}
+label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:4px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{margin-bottom:10px}
+input[type=number],input[type=text],select{width:100%;font:inherit;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.unit{position:relative}
+.unit input{padding-right:46px}
+.unit span{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--ink-3);pointer-events:none}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);padding:7px 12px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.ghost{background:transparent;border-color:transparent;color:var(--ink-3);padding:4px 6px}
+button.ghost:hover{color:var(--danger)}
+.surface{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel)}
+.surface+.surface{margin-top:10px}
+.surface-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.swatch{width:12px;height:12px;border-radius:3px;flex:none}
+.surface-head input{flex:1;font-weight:600;background:transparent;border-color:transparent;padding:4px 6px}
+.surface-head input:hover{border-color:var(--line)}
+.sgrid{display:grid;grid-template-columns:1fr 64px;gap:10px;align-items:center}
+.compass{width:64px;height:64px}
+.slider-line{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2)}
+.slider-line b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+details summary{cursor:pointer;font-weight:650;font-size:15px;list-style:none;display:flex;justify-content:space-between}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"+";color:var(--ink-3)}
+details[open] summary::after{content:"–"}
+details[open] summary{margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .l{font-size:12px;color:var(--ink-2)}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px}
+.kpi .v small{font-size:13px;font-weight:500;color:var(--ink-2);margin-left:3px}
+.kpi .h{font-size:12px;color:var(--ink-3);margin-top:2px}
+.kpi.hero{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.kpi.hero .l,.kpi.hero .v small,.kpi.hero .h{color:var(--accent-ink);opacity:.8}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.charts .wide{grid-column:1/-1}
+.layout>*,.charts>*{min-width:0}
+.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.chart-head p{margin:0;font-size:13px;color:var(--ink-2)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+svg text{fill:var(--ink-2);font-size:11px;font-family:inherit}
+.heat-wrap{position:relative}
+canvas{display:block;width:100%;border-radius:6px}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-120%);opacity:0;transition:opacity .1s}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--ink-2);font-size:12px}
+tfoot td{font-weight:700;border-bottom:none}
+.table-scroll{overflow-x:auto}
+.note{font-size:13px;color:var(--ink-2)}
+.note p{margin:0 0 8px}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);font-size:12px;color:var(--ink-2)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:980px){.layout{grid-template-columns:1fr}.charts{grid-template-columns:1fr}}
+@media (max-width:560px){.wrap{padding:20px 16px 48px}h1{font-size:23px}.kpi .v{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="tag">Entwurfswerkzeug · Photovoltaik</div>
+      <h1>Solar-Potenzial-Analyse</h1>
+      <p class="sub">Dach- und Fassadenflächen anlegen, Neigung und Ausrichtung einstellen und sofort Ertrag, CO₂-Einsparung und Amortisation ablesen. Gedacht für die frühe Entwurfsphase.</p>
+    </div>
+    <div class="actions">
+      <button id="csvBtn">CSV exportieren</button>
+      <button id="resetBtn">Zurücksetzen</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- INPUTS -->
+    <aside class="stack">
+      <section class="card">
+        <h2>Standort</h2>
+        <div class="field">
+          <label for="city">Stadt</label>
+          <select id="city"></select>
+        </div>
+        <div class="row" id="customRow" hidden>
+          <div class="field"><label for="lat">Breitengrad</label><div class="unit"><input id="lat" type="number" step="0.1" min="35" max="65"><span>°N</span></div></div>
+          <div class="field"><label for="ghi">Globalstrahlung</label><div class="unit"><input id="ghi" type="number" step="10" min="600" max="2200"><span>kWh/m²a</span></div></div>
+        </div>
+        <div class="note" id="siteInfo"></div>
+      </section>
+
+      <section class="card">
+        <div class="chart-head" style="margin-bottom:12px"><h2 style="margin:0">Flächen</h2><button class="primary" id="addBtn">+ Fläche</button></div>
+        <div id="surfaces"></div>
+      </section>
+
+      <section class="card">
+        <details open>
+          <summary>Technik &amp; Wirtschaftlichkeit</summary>
+          <div class="row">
+            <div class="field"><label for="eff">Modulwirkungsgrad</label><div class="unit"><input id="eff" type="number" step="0.5" min="5" max="30"><span>%</span></div></div>
+            <div class="field"><label for="loss">Systemverluste</label><div class="unit"><input id="loss" type="number" step="1" min="0" max="50"><span>%</span></div></div>
+            <div class="field"><label for="cost">Investition</label><div class="unit"><input id="cost" type="number" step="50" min="0"><span>€/kWp</span></div></div>
+            <div class="field"><label for="self">Eigenverbrauch</label><div class="unit"><input id="self" type="number" step="5" min="0" max="100"><span>%</span></div></div>
+            <div class="field"><label for="price">Strompreis</label><div class="unit"><input id="price" type="number" step="1" min="0"><span>ct/kWh</span></div></div>
+            <div class="field"><label for="feed">Einspeisung</label><div class="unit"><input id="feed" type="number" step="0.1" min="0"><span>ct/kWh</span></div></div>
+            <div class="field"><label for="co2">CO₂-Faktor Netz</label><div class="unit"><input id="co2" type="number" step="10" min="0"><span>g/kWh</span></div></div>
+            <div class="field"><label for="alb">Albedo Umgebung</label><div class="unit"><input id="alb" type="number" step="0.05" min="0" max="0.9"><span>–</span></div></div>
+          </div>
+        </details>
+      </section>
+    </aside>
+
+    <!-- RESULTS -->
+    <main class="stack">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="charts">
+        <section class="card wide">
+          <div class="chart-head">
+            <h2 style="margin:0">Monatlicher Ertrag</h2>
+            <div class="legend" id="legend"></div>
+          </div>
+          <div id="barChart"></div>
+        </section>
+
+        <section class="card">
+          <div class="chart-head">
+            <h2 style="margin:0">Ausrichtung &amp; Neigung</h2>
+            <p id="optText"></p>
+          </div>
+          <div class="heat-wrap">
+            <canvas id="heat" height="320"></canvas>
+            <div class="tip" id="tip"></div>
+          </div>
+          <p class="note" style="margin:8px 0 0">Relativer Jahresertrag je m² am Standort. Punkte = eure Flächen.</p>
+        </section>
+
+        <section class="card">
+          <div class="chart-head">
+            <h2 style="margin:0">Sonnenbahn</h2>
+            <div class="legend" id="sunLegend"></div>
+          </div>
+          <div id="sunChart"></div>
+          <p class="note" style="margin:8px 0 0" id="sunText"></p>
+        </section>
+
+        <section class="card wide">
+          <h2>Flächen im Vergleich</h2>
+          <div class="table-scroll"><table id="table"></table></div>
+        </section>
+
+        <section class="card wide note">
+          <h2 style="color:var(--ink)">Methodik &amp; Grenzen</h2>
+          <p>Monatliche Globalstrahlung (langjährige Mittel, Größenordnung DWD/PVGIS) wird über die Erbs-Korrelation in Direkt- und Diffusanteil getrennt, mit den Tagesprofilen nach Collares-Pereira/Rabl und Liu-Jordan auf Viertelstunden verteilt und mit dem isotropen Himmelsmodell auf die geneigte Fläche umgerechnet (Direkt + Diffus + Bodenreflexion). Der Sonnenstand wird für einen repräsentativen Tag pro Monat berechnet.</p>
+          <p>Nicht berücksichtigt: konkrete Verschattung durch Nachbarbebauung (nur als pauschaler Abschlag), Modultemperatur im Detail (steckt in den Systemverlusten), Wechselrichter-Auslegung, Degradation, Förderungen und Finanzierung. Die Ergebnisse sind eine Abschätzung für den Entwurf und ersetzen keine Fachplanung.</p>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const R = Math.PI/180;
+const DAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
+const MID=[17,47,75,105,135,162,198,228,258,288,318,344];
+const MONTHS=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const COLORS=["#e0952a","#3b7dd8","#2fa37a","#c2549a","#7a62d6","#c9573a","#5a9fb0","#8f8a2e"];
+
+// Monthly global horizontal irradiation, kWh/m² (long-term means, rounded)
+const CITIES={
+  "muenster": {name:"Münster",   lat:51.96, m:[21,38,75,118,148,152,150,127,88,54,24,16]},
+  "hamburg":  {name:"Hamburg",   lat:53.55, m:[18,34,70,115,150,150,148,122,82,48,20,13]},
+  "berlin":   {name:"Berlin",    lat:52.52, m:[20,38,77,120,155,155,155,130,88,52,22,15]},
+  "koeln":    {name:"Köln",      lat:50.94, m:[23,40,77,118,145,150,150,128,90,56,26,18]},
+  "frankfurt":{name:"Frankfurt", lat:50.11, m:[24,43,82,124,152,158,160,135,95,58,27,19]},
+  "muenchen": {name:"München",   lat:48.14, m:[30,52,90,126,152,160,165,142,103,65,32,24]},
+  "freiburg": {name:"Freiburg",  lat:47.99, m:[31,52,92,128,152,165,168,145,105,65,33,24]},
+  "custom":   {name:"Eigener Standort", lat:51.96, m:null}
+};
+
+const DEFAULTS={
+  city:"muenster", lat:51.96, ghi:1000,
+  eff:21, loss:14, cost:1400, self:30, price:35, feed:7.9, co2:380, alb:0.2,
+  surfaces:[
+    {name:"Dach Süd",     area:40, tilt:35, az:180, shade:5},
+    {name:"Dach Nord",    area:40, tilt:35, az:0,   shade:5},
+    {name:"Fassade West", area:25, tilt:90, az:270, shade:15}
+  ]
+};
+const KEY="solar-potenzial-v1";
+let S;
+try{ S=JSON.parse(localStorage.getItem(KEY)); }catch(e){ S=null; }
+if(!S||!Array.isArray(S.surfaces)) S=structuredClone(DEFAULTS);
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const fmt=(v,d=0)=>Number(v).toLocaleString("de-DE",{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function site(){
+  const c=CITIES[S.city]||CITIES.muenster;
+  if(S.city==="custom"){
+    const base=CITIES.muenster.m, sum=base.reduce((a,b)=>a+b,0);
+    return {name:c.name, lat:clamp(+S.lat||50,-65,65), m:base.map(v=>v*(+S.ghi||1000)/sum)};
+  }
+  return c;
+}
+
+/* ---------- Solar model ---------- */
+// Irradiation on a tilted plane for one month (kWh/m²)
+function monthTilted(lat, mi, Hmonth, tiltDeg, azCompass, alb){
+  const n=MID[mi], phi=lat*R, d=23.45*R*Math.sin(2*Math.PI*(284+n)/365);
+  const H=Hmonth/DAYS[mi];
+  const ws=Math.acos(clamp(-Math.tan(phi)*Math.tan(d),-1,1));
+  if(ws<=0) return 0;
+  const H0=24/Math.PI*1.367*(1+0.033*Math.cos(2*Math.PI*n/365))*
+          (Math.cos(phi)*Math.cos(d)*Math.sin(ws)+ws*Math.sin(phi)*Math.sin(d));
+  const kt=clamp(H/H0,0.05,0.8);
+  const fd = ws/R<=81.4 ? 1.391-3.560*kt+4.189*kt*kt-2.137*kt*kt*kt
+                       : 1.311-3.022*kt+3.427*kt*kt-1.821*kt*kt*kt;
+  const Hd=H*clamp(fd,0.1,1);
+  const a=0.409+0.5016*Math.sin(ws-Math.PI/3), b=0.6609-0.4767*Math.sin(ws-Math.PI/3);
+  const den=Math.sin(ws)-ws*Math.cos(ws);
+  const beta=tiltDeg*R, gam=(azCompass-180)*R; // 0 = Süd, West positiv
+  const sb=Math.sin(beta), cb=Math.cos(beta), sg=Math.sin(gam), cg=Math.cos(gam);
+  const sp=Math.sin(phi), cp=Math.cos(phi), sd=Math.sin(d), cd=Math.cos(d), cws=Math.cos(ws);
+  const N=56, dw=2*ws/N, dt=dw*12/Math.PI;
+  let It=0;
+  for(let i=0;i<N;i++){
+    const w=-ws+(i+0.5)*dw, cw=Math.cos(w), sw=Math.sin(w);
+    const rd=(Math.PI/24)*(cw-cws)/den, rt=rd*(a+b*cw);
+    const I=rt*H*dt, Id=rd*Hd*dt, Ib=Math.max(0,I-Id);
+    const cz=cp*cd*cw+sp*sd;
+    if(cz<=0) continue;
+    const ct=sd*sp*cb - sd*cp*sb*cg + cd*cp*cb*cw + cd*sp*sb*cg*cw + cd*sb*sg*sw;
+    const Rb=ct>0 ? ct/Math.max(cz,0.08) : 0;
+    It+=Ib*Rb + Id*(1+cb)/2 + I*alb*(1-cb)/2;
+  }
+  return It*DAYS[mi];
+}
+function yearTilted(st, tilt, az, alb){
+  const out=new Array(12);
+  for(let m=0;m<12;m++) out[m]=monthTilted(st.lat,m,st.m[m],tilt,az,alb);
+  return out;
+}
+function sunPath(lat, n){
+  const phi=lat*R, d=23.45*R*Math.sin(2*Math.PI*(284+n)/365);
+  const ws=Math.acos(clamp(-Math.tan(phi)*Math.tan(d),-1,1));
+  const pts=[];
+  for(let k=0;k<=60;k++){
+    const w=-ws+2*ws*k/60;
+    const cz=clamp(Math.cos(phi)*Math.cos(d)*Math.cos(w)+Math.sin(phi)*Math.sin(d),-1,1);
+    const z=Math.acos(cz), alt=90-z/R;
+    let ca=(cz*Math.sin(phi)-Math.sin(d))/(Math.sin(z)*Math.cos(phi)||1e-9);
+    const gs=(w<0?-1:1)*Math.acos(clamp(ca,-1,1))/R;
+    pts.push([180+gs, Math.max(0,alt)]);
+  }
+  const noon=90-Math.abs(lat-d/R);
+  return {pts, noon, hours:2*ws/R/15};
+}
+
+/* ---------- Compute ---------- */
+function compute(){
+  const st=site(), eff=(+S.eff||0)/100, loss=(+S.loss||0)/100, alb=+S.alb||0;
+  const rows=S.surfaces.map((s,i)=>{
+    const irr=yearTilted(st,+s.tilt,+s.az,alb);
+    const k=(+s.area||0)*eff*(1-loss)*(1-(+s.shade||0)/100);
+    const monthly=irr.map(v=>v*k);
+    const E=monthly.reduce((a,b)=>a+b,0);
+    const kwp=(+s.area||0)*eff;
+    return {s,i,irr,irrYear:irr.reduce((a,b)=>a+b,0),monthly,E,kwp,spec:kwp?E/kwp:0};
+  });
+  const E=rows.reduce((a,r)=>a+r.E,0), kwp=rows.reduce((a,r)=>a+r.kwp,0);
+  const sc=clamp((+S.self||0)/100,0,1);
+  const savings=E*sc*(+S.price||0)/100 + E*(1-sc)*(+S.feed||0)/100;
+  const invest=kwp*(+S.cost||0);
+  return {st,rows,E,kwp,spec:kwp?E/kwp:0,savings,invest,payback:savings>0?invest/savings:Infinity,co2:E*(+S.co2||0)/1e6};
+}
+
+/* ---------- UI: surfaces ---------- */
+function azLabel(a){ const n=["N","NO","O","SO","S","SW","W","NW"]; return n[Math.round(((a%360)+360)%360/45)%8]; }
+function compassSVG(az,tilt,color){
+  const a=(az-90)*R, r=24, x=32+r*Math.cos(a), y=32+r*Math.sin(a);
+  return `<svg class="compass" viewBox="0 0 64 64" aria-hidden="true">
+    <circle cx="32" cy="32" r="27" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="32" y="11" text-anchor="middle" style="font-size:8px">N</text>
+    <text x="32" y="59" text-anchor="middle" style="font-size:8px">S</text>
+    <text x="57" y="35" text-anchor="middle" style="font-size:8px">O</text>
+    <text x="7" y="35" text-anchor="middle" style="font-size:8px">W</text>
+    <line x1="32" y1="32" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${3+tilt/30}" fill="${color}"/>
+    <circle cx="32" cy="32" r="2.5" fill="var(--ink-2)"/></svg>`;
+}
+// Note: compass is drawn as plan view, East on the right, so West is left.
+function renderSurfaces(){
+  const box=$("surfaces");
+  box.innerHTML=S.surfaces.map((s,i)=>{
+    const c=COLORS[i%COLORS.length];
+    return `<div class="surface" data-i="${i}">
+      <div class="surface-head">
+        <span class="swatch" style="background:${c}"></span>
+        <input type="text" data-k="name" value="${esc(s.name)}" aria-label="Name der Fläche">
+        <button class="ghost" data-del="${i}" title="Fläche entfernen" aria-label="Fläche entfernen">✕</button>
+      </div>
+      <div class="row">
+        <div class="field"><label>Fläche</label><div class="unit"><input type="number" data-k="area" min="0" step="1" value="${s.area}"><span>m²</span></div></div>
+        <div class="field"><label>Verschattung</label><div class="unit"><input type="number" data-k="shade" min="0" max="90" step="1" value="${s.shade}"><span>%</span></div></div>
+      </div>
+      <div class="sgrid">
+        <div>
+          <div class="slider-line"><span>Neigung</span><b data-out="tilt">${s.tilt}°</b></div>
+          <input type="range" data-k="tilt" min="0" max="90" step="1" value="${s.tilt}" aria-label="Neigung">
+          <div class="slider-line" style="margin-top:6px"><span>Ausrichtung</span><b data-out="az">${s.az}° ${azLabel(s.az)}</b></div>
+          <input type="range" data-k="az" min="0" max="360" step="5" value="${s.az}" aria-label="Ausrichtung (Azimut)">
+        </div>
+        <div data-compass>${compassSVG(s.az,s.tilt,c)}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+$("surfaces").addEventListener("input",e=>{
+  const el=e.target, card=el.closest(".surface"); if(!card) return;
+  const i=+card.dataset.i, k=el.dataset.k; if(!k) return;
+  S.surfaces[i][k]= k==="name" ? el.value : (+el.value||0);
+  const s=S.surfaces[i];
+  if(k==="tilt") card.querySelector('[data-out="tilt"]').textContent=s.tilt+"°";
+  if(k==="az") card.querySelector('[data-out="az"]').textContent=s.az+"° "+azLabel(s.az);
+  if(k==="tilt"||k==="az") card.querySelector("[data-compass]").innerHTML=compassSVG(s.az,s.tilt,COLORS[i%COLORS.length]);
+  update();
+});
+$("surfaces").addEventListener("click",e=>{
+  const b=e.target.closest("[data-del]"); if(!b) return;
+  S.surfaces.splice(+b.dataset.del,1); renderSurfaces(); update();
+});
+$("addBtn").addEventListener("click",()=>{
+  S.surfaces.push({name:"Fläche "+(S.surfaces.length+1),area:20,tilt:30,az:180,shade:5});
+  renderSurfaces(); update();
+});
+
+/* ---------- UI: params ---------- */
+const city=$("city");
+city.innerHTML=Object.entries(CITIES).map(([k,c])=>`<option value="${k}">${c.name}</option>`).join("");
+const params=["eff","loss","cost","self","price","feed","co2","alb"];
+function syncInputs(){
+  city.value=S.city; $("lat").value=S.lat; $("ghi").value=S.ghi;
+  $("customRow").hidden=S.city!=="custom";
+  params.forEach(p=>$(p).value=S[p]);
+}
+city.addEventListener("change",()=>{ S.city=city.value; $("customRow").hidden=S.city!=="custom"; heatDirty=true; update(); });
+["lat","ghi"].forEach(p=>$(p).addEventListener("input",()=>{ S[p]=+$(p).value; heatDirty=true; update(); }));
+params.forEach(p=>$(p).addEventListener("input",()=>{ S[p]=+$(p).value; if(p==="alb") heatDirty=true; update(); }));
+$("resetBtn").addEventListener("click",()=>{ S=structuredClone(DEFAULTS); syncInputs(); renderSurfaces(); heatDirty=true; update(); });
+
+/* ---------- Rendering ---------- */
+function kpi(l,v,u,h,hero){ return `<div class="kpi${hero?" hero":""}"><div class="l">${l}</div><div class="v">${v}<small>${u}</small></div><div class="h">${h}</div></div>`; }
+function renderKPIs(r){
+  const pb=isFinite(r.payback)?fmt(r.payback,1):"–";
+  $("kpis").innerHTML=
+    kpi("Jahresertrag",fmt(r.E),"kWh",`${fmt(r.spec)} kWh/kWp`,true)+
+    kpi("Leistung",fmt(r.kwp,1),"kWp",`${fmt(S.surfaces.reduce((a,s)=>a+(+s.area||0),0))} m² Modulfläche`)+
+    kpi("CO₂-Einsparung",fmt(r.co2,1),"t/a",`≈ ${fmt(r.co2*1000/12.5)} Bäume`)+
+    kpi("Ersparnis",fmt(r.savings),"€/a",`Investition ${fmt(r.invest)} €`)+
+    kpi("Amortisation",pb,"Jahre",r.payback<=20?"innerhalb der Modullebensdauer":"wirtschaftlich kritisch");
+}
+
+function renderBars(r){
+  const W=760,H=260,pl=48,pr=10,pt=12,pb=26, cw=(W-pl-pr)/12;
+  const tot=MONTHS.map((_,m)=>r.rows.reduce((a,x)=>a+x.monthly[m],0));
+  const max=niceMax(Math.max(1,...tot));
+  const y=v=>pt+(H-pt-pb)*(1-v/max);
+  let g="";
+  for(let t=0;t<=4;t++){ const v=max*t/4, yy=y(v);
+    g+=`<line x1="${pl}" x2="${W-pr}" y1="${yy}" y2="${yy}" stroke="var(--grid)"/><text x="${pl-6}" y="${yy+4}" text-anchor="end">${fmt(v)}</text>`; }
+  let bars="";
+  MONTHS.forEach((mn,m)=>{
+    let acc=0; const x=pl+m*cw+cw*0.18, bw=cw*0.64;
+    r.rows.forEach((row,i)=>{
+      const v=row.monthly[m]; if(v<=0) return;
+      const y1=y(acc+v), h=y(acc)-y1;
+      bars+=`<rect x="${x}" y="${y1}" width="${bw}" height="${Math.max(0,h-1)}" rx="2" fill="${COLORS[i%COLORS.length]}"><title>${esc(row.s.name)} · ${mn}: ${fmt(v)} kWh</title></rect>`;
+      acc+=v;
+    });
+    bars+=`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle">${mn}</text>`;
+    bars+=`<rect x="${pl+m*cw}" y="${pt}" width="${cw}" height="${H-pt-pb}" fill="transparent"><title>${mn}: ${fmt(tot[m])} kWh gesamt</title></rect>`;
+  });
+  $("barChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Monatlicher Ertrag">${g}<text x="${pl-6}" y="${H-8}" text-anchor="end">kWh</text>${bars}</svg>`;
+  $("legend").innerHTML=r.rows.map((row,i)=>`<span><i class="swatch" style="background:${COLORS[i%COLORS.length]}"></i>${esc(row.s.name)}</span>`).join("");
+}
+function niceMax(v){ const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
+
+/* heatmap */
+let heatDirty=true, heatData=null, heatKey="";
+const TS=5, AS=10; // steps
+function computeHeat(st){
+  const alb=+S.alb||0, grid=[]; let max=0, best=[0,180];
+  for(let t=0;t<=90;t+=TS){
+    const row=[];
+    for(let a=0;a<=360;a+=AS){
+      const v=yearTilted(st,t,a,alb).reduce((x,y)=>x+y,0);
+      row.push(v); if(v>max){max=v;best=[t,a];}
+    }
+    grid.push(row);
+  }
+  return {grid,max,best};
+}
+function ramp(f){
+  // sequential: dark blue → teal → amber → light yellow
+  const stops=[[38,52,92],[46,120,140],[224,149,42],[250,220,120]];
+  const x=clamp(f,0,1)*(stops.length-1), i=Math.min(stops.length-2,Math.floor(x)), u=x-i;
+  const c=stops[i].map((v,k)=>Math.round(v+(stops[i+1][k]-v)*u));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+const heat=$("heat"), ctx=heat.getContext("2d");
+let heatGeom=null;
+function drawHeat(r){
+  const st=r.st, key=st.lat+"|"+st.m.join(",")+"|"+S.alb;
+  if(heatDirty||key!==heatKey){ heatData=computeHeat(st); heatKey=key; heatDirty=false; }
+  const dpr=window.devicePixelRatio||1, cssW=heat.clientWidth||600, cssH=Math.round(Math.min(340,Math.max(240,cssW*0.6)));
+  heat.style.height=cssH+"px"; heat.width=cssW*dpr; heat.height=cssH*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  const pl=34,pr=8,pt=8,pb=24, W=cssW-pl-pr, H=cssH-pt-pb;
+  const cs=getComputedStyle(document.documentElement);
+  ctx.clearRect(0,0,cssW,cssH);
+  const {grid,max,best}=heatData, nT=grid.length, nA=grid[0].length;
+  // draw the coarse grid into a tiny canvas, then scale up smoothly
+  const off=document.createElement("canvas"); off.width=nA; off.height=nT;
+  const oc=off.getContext("2d");
+  for(let ti=0;ti<nT;ti++) for(let ai=0;ai<nA;ai++){
+    oc.fillStyle=ramp((grid[ti][ai]/max-0.3)/0.7); oc.fillRect(ai,ti,1,1);
+  }
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+  ctx.drawImage(off,0.5,0.5,nA-1,nT-1,pl,pt,W,H);
+  // contours text labels
+  ctx.fillStyle=cs.getPropertyValue("--ink-2"); ctx.font="11px system-ui,sans-serif"; ctx.textAlign="center";
+  [["N",0],["O",90],["S",180],["W",270],["N",360]].forEach(([l,a])=>ctx.fillText(l,pl+a/360*W,cssH-8));
+  ctx.textAlign="right";
+  [0,30,60,90].forEach(t=>ctx.fillText(t+"°",pl-6,pt+t/90*H+4));
+  // surfaces
+  r.rows.forEach((row,i)=>{
+    const x=pl+(((+row.s.az%360)+360)%360)/360*W, y=pt+clamp(+row.s.tilt,0,90)/90*H;
+    ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.fillStyle=COLORS[i%COLORS.length]; ctx.fill();
+    ctx.lineWidth=2.5; ctx.strokeStyle="#fff"; ctx.stroke();
+  });
+  // optimum
+  const ox=pl+best[1]/360*W, oy=pt+best[0]/90*H;
+  ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(ox-6,oy);ctx.lineTo(ox+6,oy);ctx.moveTo(ox,oy-6);ctx.lineTo(ox,oy+6);ctx.stroke();
+  heatGeom={pl,pt,W,H};
+  $("optText").textContent=`Optimum: ${best[0]}° Neigung, ${best[1]}° ${azLabel(best[1])}`;
+}
+heat.addEventListener("mousemove",e=>{
+  if(!heatGeom||!heatData) return;
+  const b=heat.getBoundingClientRect(), x=e.clientX-b.left, y=e.clientY-b.top, g=heatGeom;
+  const tip=$("tip");
+  if(x<g.pl||x>g.pl+g.W||y<g.pt||y>g.pt+g.H){ tip.style.opacity=0; return; }
+  const ai=Math.round((x-g.pl)/g.W*360/AS), ti=Math.round((y-g.pt)/g.H*90/TS);
+  const v=heatData.grid[ti][ai];
+  tip.textContent=`${ti*TS}° · ${ai*AS}° ${azLabel(ai*AS)} → ${fmt(v/heatData.max*100)} % (${fmt(v)} kWh/m²a)`;
+  tip.style.left=x+"px"; tip.style.top=y+"px"; tip.style.opacity=1;
+});
+heat.addEventListener("mouseleave",()=>$("tip").style.opacity=0);
+
+function renderSun(st){
+  const W=380,H=230,pl=34,pr=10,pt=10,pb=24;
+  const days=[[172,"21. Juni","#e0952a"],[80,"21. März / Sep.","#2fa37a"],[355,"21. Dez.","#3b7dd8"]];
+  const x=a=>pl+(a-30)/300*(W-pl-pr), y=h=>pt+(H-pt-pb)*(1-h/70);
+  let g="";
+  [0,15,30,45,60].forEach(h=>g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(h)}" y2="${y(h)}" stroke="var(--grid)"/><text x="${pl-5}" y="${y(h)+4}" text-anchor="end">${h}°</text>`);
+  [["NO",45],["O",90],["SO",135],["S",180],["SW",225],["W",270],["NW",315]].forEach(([l,a])=>g+=`<text x="${x(a)}" y="${H-7}" text-anchor="middle">${l}</text>`);
+  const info=[];
+  days.forEach(([n,label,c])=>{
+    const p=sunPath(st.lat,n);
+    const d=p.pts.filter(q=>q[0]>=30&&q[0]<=330).map((q,k)=>(k?"L":"M")+x(q[0]).toFixed(1)+","+y(q[1]).toFixed(1)).join("");
+    g+=`<path d="${d}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round"/>`;
+    g+=`<circle cx="${x(180)}" cy="${y(p.noon)}" r="3.5" fill="${c}"><title>${label}: ${fmt(p.noon,1)}° mittags, ${fmt(p.hours,1)} h Tag</title></circle>`;
+    info.push([label,p.noon,p.hours]);
+  });
+  $("sunChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Sonnenbahndiagramm">${g}</svg>`;
+  $("sunLegend").innerHTML=days.map(([,l,c])=>`<span><i class="swatch" style="background:${c}"></i>${l}</span>`).join("");
+  $("sunText").innerHTML=`Mittagssonne ${fmt(info[0][1],1)}° im Sommer, ${fmt(info[2][1],1)}° im Winter. Taglänge ${fmt(info[0][2],1)} h bzw. ${fmt(info[2][2],1)} h. Wichtig für Abstände und Verschattung.`;
+}
+
+function renderTable(r){
+  const best=heatData?heatData.max:1;
+  $("table").innerHTML=`<thead><tr><th>Fläche</th><th>m²</th><th>Neigung</th><th>Ausrichtung</th><th>kWp</th><th>Einstrahlung kWh/m²a</th><th>vom Optimum</th><th>kWh/kWp</th><th>Ertrag kWh/a</th><th>Anteil</th></tr></thead><tbody>`+
+    r.rows.map((row,i)=>`<tr><td><span class="swatch" style="display:inline-block;background:${COLORS[i%COLORS.length]};margin-right:6px;vertical-align:-1px"></span>${esc(row.s.name)}</td><td>${fmt(row.s.area)}</td><td>${row.s.tilt}°</td><td>${row.s.az}° ${azLabel(row.s.az)}</td><td>${fmt(row.kwp,1)}</td><td>${fmt(row.irrYear)}</td><td>${fmt(row.irrYear/best*100)} %</td><td>${fmt(row.spec)}</td><td>${fmt(row.E)}</td><td>${r.E?fmt(row.E/r.E*100):0} %</td></tr>`).join("")+
+    `</tbody><tfoot><tr><td>Gesamt</td><td>${fmt(S.surfaces.reduce((a,s)=>a+(+s.area||0),0))}</td><td></td><td></td><td>${fmt(r.kwp,1)}</td><td></td><td></td><td>${fmt(r.spec)}</td><td>${fmt(r.E)}</td><td>100 %</td></tr></tfoot>`;
+}
+
+function renderSite(st){
+  const year=st.m.reduce((a,b)=>a+b,0);
+  $("siteInfo").innerHTML=`<span class="pill">${fmt(st.lat,2)}° N</span> <span class="pill">${fmt(year)} kWh/m²a Globalstrahlung</span>`;
+}
+
+let last;
+function update(){
+  save();
+  const r=compute(); last=r;
+  renderSite(r.st); renderKPIs(r); renderBars(r); drawHeat(r); renderSun(r.st); renderTable(r);
+}
+
+$("csvBtn").addEventListener("click",()=>{
+  const r=last||compute();
+  const head=["Fläche","m²","Neigung °","Azimut °","kWp",...MONTHS.map(m=>m+" kWh"),"Jahr kWh","kWh/kWp"];
+  const lines=[head.join(";")];
+  r.rows.forEach(row=>lines.push([row.s.name,row.s.area,row.s.tilt,row.s.az,fmt(row.kwp,2),...row.monthly.map(v=>fmt(v)),fmt(row.E),fmt(row.spec)].join(";")));
+  lines.push(["Gesamt","","","",fmt(r.kwp,2),...MONTHS.map((_,m)=>fmt(r.rows.reduce((a,x)=>a+x.monthly[m],0))),fmt(r.E),fmt(r.spec)].join(";"));
+  lines.push("");
+  lines.push(`Standort;${r.st.name};${r.st.lat}° N`);
+  lines.push(`Ersparnis €/a;${fmt(r.savings)};Investition €;${fmt(r.invest)};Amortisation Jahre;${isFinite(r.payback)?fmt(r.payback,1):"-"};CO2 t/a;${fmt(r.co2,2)}`);
+  const blob=new Blob(["﻿"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="solar-potenzial.csv"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+
+let rt; window.addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>last&&drawHeat(last),120); });
+
+syncInputs(); renderSurfaces(); update();
+})();
+</script>
+</body>
+</html>
